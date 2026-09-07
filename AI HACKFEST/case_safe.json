@@ -1,0 +1,16 @@
+{
+  "transaction_id": "TX-20260907-88901",
+  "timestamp": "2026-09-07T21:16:45Z",
+  "raw_emvco_payload": "00020101021126580016ID.CO.QRIS.WWW011893600911000000123402150001234567890125204541153033605802ID5914Toko Sembako B6007Jakarta61051234562070703A016304A1B2",
+  "device_context": {
+    "user_id": "USR-9921",
+    "gps_location": {
+      "latitude": -6.175392,
+      "longitude": 106.827153,
+      "city": "Jakarta"
+    },
+    "ocr_detected_text": [
+      "Toko Sembako B"
+    ]
+  }
+}
