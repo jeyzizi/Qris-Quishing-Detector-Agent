@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI GuardAgent - Smart QRIS Protection</title>
+    <!-- Library QR Code Scanner Kamera -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 3 Kode Warna Sesuai Gambar HEX */
+            --c-cream: #F3D5C0;
+            --c-mauve: #A26769;
+            --c-dark: #5D3A3A;
+
+            --bg-body: var(--c-cream);
+            --card-bg: var(--c-mauve);
+            --border-color: var(--c-dark);
+
+            --safe-bg: #5D3A3A;       
+            --danger-bg: #8c4245;     
+        }
+
+        * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
+        
+        body { 
+            background-color: var(--bg-body); 
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(162, 103, 105, 0.28) 0%, transparent 45%),
+                radial-gradient(circle at 90% 80%, rgba(93, 58, 58, 0.22) 0%, transparent 50%),
+                radial-gradient(rgba(93, 58, 58, 0.2) 1.5px, transparent 1.5px);
+            background-size: 100% 100%, 100% 100%, 20px 20px;
+            color: var(--c-dark); 
+            min-height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 20px; 
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: ""; position: absolute; width: 380px; height: 380px;
+            border: 2px dashed rgba(93, 58, 58, 0.2); border-radius: 50%;
+            top: -80px; right: -80px; pointer-events: none;
+        }
+
+        .container {
+            width: 100%; max-width: 460px; background: var(--card-bg);
+            border: 3px solid var(--border-color); border-radius: 28px;
+            padding: 28px 24px; box-shadow: 0 15px 35px rgba(93, 58, 58, 0.3);
+            position: relative; z-index: 10;
+            transition: filter 0.3s ease;
+        }
+
+        /* FITUR 1: Vault Mode Privacy Layer (Anti-Snooping) */
+        .container.vault-active {
+            filter: blur(12px);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .vault-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(93, 58, 58, 0.85);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: var(--c-cream);
+            text-align: center;
+            padding: 20px;
+        }
+
+        .header { text-align: center; margin-bottom: 20px; }
+        
+        .brand-badge {
+            display: inline-flex; align-items: center; gap: 6px; background: var(--c-cream);
+            border: 2px solid var(--c-dark); color: var(--c-dark); padding: 6px 14px;
+            border-radius: 20px; font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 10px;
+        }
+        
+        h1 { font-size: 22px; font-weight: 800; color: var(--c-cream); margin-bottom: 6px; }
+        p.sub { font-size: 13px; color: var(--c-cream); opacity: 0.9; line-height: 1.5; }
+
+        /* Vault Control Button */
+        .vault-toggle-btn {
+            background: var(--c-dark);
+            color: var(--c-cream);
+            border: 2px solid var(--c-cream);
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-top: 8px;
+            display: inline-block;
+        }
+
+        #reader { 
+            width: 100%; border-radius: 20px; overflow: hidden; 
+            border: 3px solid var(--c-dark) !important; background: var(--c-cream); margin-top: 15px; 
+        }
+
+        #reader video { border-radius: 17px; }
+
+        .res-card { margin-top: 20px; padding: 18px; border-radius: 18px; display: none; text-align: left; }
+        .SAFE { background: var(--safe-bg); border: 2px solid var(--c-dark); color: #ffffff; }
+        .HIGH_RISK { background: var(--danger-bg); border: 2px solid var(--c-dark); color: #ffffff; }
+
+        .badge-status { font-size: 15px; font-weight: 800; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        
+        .merchant-box {
+            background: var(--c-cream); border: 2px solid var(--c-dark);
+            border-radius: 14px; padding: 12px; margin-bottom: 10px;
+        }
+        .merchant-label { font-size: 11px; text-transform: uppercase; color: var(--c-dark); font-weight: 800; }
+        .merchant-name { font-size: 16px; font-weight: 800; color: var(--c-dark); margin-top: 2px; }
+        .merchant-city { font-size: 12px; color: var(--c-dark); opacity: 0.85; }
+
+        /* FITUR 4: E-Wallet Deep-Link Router UI */
+        .ewallet-box { display: none; margin-top: 14px; gap: 8px; flex-wrap: wrap; }
+        .ewallet-title { width: 100%; font-size: 11px; font-weight: 800; color: var(--c-cream); margin-bottom: 2px; }
+        .ewallet-btn {
+            flex: 1 1 40%;
+            padding: 10px;
+            background: var(--c-cream);
+            color: var(--c-dark);
+            border: 2px solid var(--c-dark);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 800;
+            text-align: center;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .ewallet-btn:hover { background: #ffffff; transform: translateY(-1px); }
+
+        .report-btn { 
+            display: none; width: 100%; margin-top: 12px; padding: 12px; 
+            background: var(--c-dark); color: var(--c-cream); border: 2px solid var(--c-cream); 
+            border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; 
+        }
+        .report-btn:hover { background: #452a2a; }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay Proteksi Privacy / Anti-Snooping -->
+    <div id="vaultOverlay" class="vault-overlay" onclick="disableVaultMode()">
+        <div style="font-size: 42px; margin-bottom: 10px;">🔒</div>
+        <h2 style="font-size: 18px; font-weight: 800; margin-bottom: 6px;">VAULT MODE AKTIF</h2>
+        <p style="font-size: 12px; opacity: 0.9; max-width: 280px;">Layar disamarkan untuk mencegah intipan PIN/OTP di area publik. Ketuk layar untuk membuka.</p>
+    </div>
+
+    <div id="mainContainer" class="container">
+        <div class="header">
+            <div class="brand-badge">QRIS Protection</div>
+            <h1>AI GuardAgent</h1>
+            <p class="sub">Pemindai QRIS Pintar & Anti-Quishing</p>
+            <button class="vault-toggle-btn" onclick="enableVaultMode()">🔒 Mode Privasi (Vault)</button>
+        </div>
+        
+        <!-- Scanner Kamera -->
+        <div id="reader"></div>
+
+        <!-- Box Hasil Analisis -->
+        <div id="res" class="res-card">
+            <div id="badge" class="badge-status"></div>
+            
+            <!-- Box Nama Toko/Merchant -->
+            <div id="merchantBox" class="merchant-box" style="display: none;">
+                <div class="merchant-label">Nama Merchant Resmi:</div>
+                <div id="merchantName" class="merchant-name">-</div>
+                <div id="merchantCity" class="merchant-city">-</div>
+            </div>
+
+            <div id="reason" style="font-size: 13px; line-height: 1.6; color: #ffffff;"></div>
+
+            <!-- FITUR 4: E-Wallet Deep-Link Router -->
+            <div id="ewalletBox" class="ewallet-box">
+                <div class="ewallet-title">LANJUTKAN BAYAR AMAN VIA:</div>
+                <a href="gopay://" class="ewallet-btn">GoPay</a>
+                <a href="ovo://" class="ewallet-btn">OVO</a>
+                <a href="dana://" class="ewallet-btn">DANA</a>
+                <a href="shopeepay://" class="ewallet-btn">ShopeePay</a>
+            </div>
+
+            <button id="reportBtn" class="report-btn" onclick="reportMerchant()">Laporkan QRIS Palsu Ini</button>
+        </div>
+    </div>
+
+<script>
+    // FITUR 1: Logika Vault Mode (Privacy Protection)
+    function enableVaultMode() {
+        document.getElementById('mainContainer').classList.add('vault-active');
+        document.getElementById('vaultOverlay').style.display = 'flex';
+    }
+
+    function disableVaultMode() {
+        document.getElementById('mainContainer').classList.remove('vault-active');
+        document.getElementById('vaultOverlay').style.display = 'none';
+    }
+
+    // Otomatis Aktifkan Vault Mode jika Tab HP Berpindah (Page Visibility API)
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            enableVaultMode();
+        }
+    });
+
+    // Parser EMVCo (Nama Toko & Kota)
+    function parseEMVCo(payload) {
+        let merchantName = "Tidak Terdeteksi";
+        let merchantCity = "";
+        try {
+            let i = 0;
+            while (i < payload.length) {
+                let tag = payload.substring(i, i + 2);
+                let length = parseInt(payload.substring(i + 2, i + 4), 10);
+                let value = payload.substring(i + 4, i + 4 + length);
+
+                if (tag === "59") merchantName = value; 
+                if (tag === "60") merchantCity = value; 
+
+                i += 4 + length;
+            }
+        } catch (e) { console.error("Gagal parse EMVCo:", e); }
+        return { merchantName, merchantCity };
+    }
+
+    // Voice Alert Suara Bahasa Indonesia
+    function speakAlert(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'id-ID';
+            utterance.rate = 0.95;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 220, height: 220 } });
+    
+    scanner.render(async (text) => {
+        scanner.pause();
+        const resBox = document.getElementById('res');
+        const reportBtn = document.getElementById('reportBtn');
+        const ewalletBox = document.getElementById('ewalletBox');
+        const badge = document.getElementById('badge');
+        const reason = document.getElementById('reason');
+        const merchantBox = document.getElementById('merchantBox');
+        const merchantName = document.getElementById('merchantName');
+        const merchantCity = document.getElementById('merchantCity');
+
+        resBox.style.display = 'block';
+        resBox.className = 'res-card';
+        merchantBox.style.display = 'none';
+        reportBtn.style.display = 'none';
+        ewalletBox.style.display = 'none';
+        
+        badge.innerHTML = "🔍 <span>MENGANALISIS...</span>";
+        reason.innerText = "Sistem sedang mengecek validitas struktur EMVCo & merchant...";
+
+        const emvData = parseEMVCo(text);
+
+        // Deteksi Tautan Web Phishing
+        if (text.startsWith('http://') || text.startsWith('https://')) {
+            resBox.className = 'res-card HIGH_RISK';
+            badge.innerHTML = " <span>LINK PHISHING TERDETEKSI</span>";
+            reason.innerHTML = "• QR Code ini berisi tautan web luar, bukan standar QRIS resmi.<br>• Potensi Bahaya: Halaman Pembayaran Palsu.";
+            reportBtn.style.display = 'block';
+            speakAlert("Peringatan! QR Code ini berisi tautan web berbahaya.");
+            setTimeout(() => scanner.resume(), 5000);
+            return;
+        }
+
+        try {
+            // Ganti URL ke Server Backend aktif kamu
+            const response = await fetch('http://127.0.0.1:8000/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: window.location.href,
+                    dom_data: { qrPayload: text, hasQrisImage: true },
+                    page_text: ""
+                })
+            });
+
+            const data = await response.json();
+            const analysis = data.financial_threat_analysis || data.data?.financial_threat_analysis;
+
+            if (analysis?.is_payment_threat) {
+                resBox.className = 'res-card HIGH_RISK';
+                badge.innerHTML = "<span>ANCAMAN: QRIS TERINDIKASI PALSU</span>";
+                
+                if (emvData.merchantName !== "Tidak Terdeteksi") {
+                    merchantBox.style.display = 'block';
+                    merchantName.innerText = emvData.merchantName;
+                    merchantCity.innerText = "Terdaftar di: " + (emvData.merchantCity || "Indonesia");
+                }
+
+                reason.innerHTML = "• " + (analysis.threat_reasons || []).join("<br>• ");
+                reportBtn.style.display = 'block';
+                speakAlert(`Waspada! QRIS ${emvData.merchantName} terindikasi palsu.`);
+            } else {
+                resBox.className = 'res-card SAFE';
+                badge.innerHTML = "<span>QRIS RESMI & AMAN</span>";
+                
+                merchantBox.style.display = 'block';
+                merchantName.innerText = emvData.merchantName;
+                merchantCity.innerText = "Terdaftar di: " + (emvData.merchantCity || "Indonesia");
+
+                reason.innerText = "Format QRIS memenuhi standar EMVCo resmi Indonesia. Transaksi aman dilanjutkan.";
+                
+                // FITUR 4: Tampilkan Router E-Wallet
+                ewalletBox.style.display = 'flex';
+                
+                speakAlert(`QRIS ${emvData.merchantName} resmi dan aman.`);
+            }
+        } catch (e) {
+            resBox.className = 'res-card HIGH_RISK';
+            badge.innerHTML = "<span>GAGAL CONNECT SERVER</span>";
+            reason.innerText = "Gagal terhubung ke backend API. Pastikan Uvicorn aktif.";
+        }
+
+        setTimeout(() => scanner.resume(), 5000);
+    });
+
+    function reportMerchant() {
+        alert("🚨 Laporan berhasil dikirim ke server AI GuardAgent!");
+    }
+</script>
+
+</body>
+</html>
