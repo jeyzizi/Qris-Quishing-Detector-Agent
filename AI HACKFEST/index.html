@@ -249,7 +249,15 @@
     const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 220, height: 220 } });
     
     scanner.render(async (text) => {
-        scanner.pause();
+        // PERBAIKAN: Bungkus .pause() dengan try-catch agar upload gambar dari file tidak melempar error
+        try {
+            if (scanner.getState && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
+                scanner.pause(true);
+            }
+        } catch (e) {
+            console.log("Mode pemindaian file gambar aktif, abaikan pause kamera.");
+        }
+
         const resBox = document.getElementById('res');
         const reportBtn = document.getElementById('reportBtn');
         const ewalletBox = document.getElementById('ewalletBox');
@@ -273,17 +281,20 @@
         // Deteksi Tautan Web Phishing
         if (text.startsWith('http://') || text.startsWith('https://')) {
             resBox.className = 'res-card HIGH_RISK';
-            badge.innerHTML = " <span>LINK PHISHING TERDETEKSI</span>";
+            badge.innerHTML = "<span>LINK PHISHING TERDETEKSI</span>";
             reason.innerHTML = "• QR Code ini berisi tautan web luar, bukan standar QRIS resmi.<br>• Potensi Bahaya: Halaman Pembayaran Palsu.";
             reportBtn.style.display = 'block';
             speakAlert("Peringatan! QR Code ini berisi tautan web berbahaya.");
-            setTimeout(() => scanner.resume(), 5000);
+            
+            setTimeout(() => {
+                try { scanner.resume(); } catch(e){}
+            }, 5000);
             return;
         }
 
         try {
-            // Ganti URL ke Server Backend aktif kamu
-            const response = await fetch('http://127.0.0.1:8000/scan', {
+            // Panggil API Backend VPS
+            const response = await fetch('http://103.30.146.125/scan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -294,9 +305,11 @@
             });
 
             const data = await response.json();
-            const analysis = data.financial_threat_analysis || data.data?.financial_threat_analysis;
+            
+            // PERBAIKAN: Fleksibilitas parsing response dari FastAPI
+            const analysis = data.financial_threat_analysis || data.data?.financial_threat_analysis || data;
 
-            if (analysis?.is_payment_threat) {
+            if (analysis?.is_payment_threat || analysis?.is_threat) {
                 resBox.className = 'res-card HIGH_RISK';
                 badge.innerHTML = "<span>ANCAMAN: QRIS TERINDIKASI PALSU</span>";
                 
@@ -306,7 +319,8 @@
                     merchantCity.innerText = "Terdaftar di: " + (emvData.merchantCity || "Indonesia");
                 }
 
-                reason.innerHTML = "• " + (analysis.threat_reasons || []).join("<br>• ");
+                const threatList = analysis.threat_reasons || analysis.reasons || ["QRIS terindikasi bermasalah"];
+                reason.innerHTML = "• " + threatList.join("<br>• ");
                 reportBtn.style.display = 'block';
                 speakAlert(`Waspada! QRIS ${emvData.merchantName} terindikasi palsu.`);
             } else {
@@ -325,12 +339,15 @@
                 speakAlert(`QRIS ${emvData.merchantName} resmi dan aman.`);
             }
         } catch (e) {
+            console.error("Fetch Error:", e);
             resBox.className = 'res-card HIGH_RISK';
             badge.innerHTML = "<span>GAGAL CONNECT SERVER</span>";
-            reason.innerText = "Gagal terhubung ke backend API. Pastikan Uvicorn aktif.";
+            reason.innerText = "Gagal terhubung ke backend API. Pastikan Uvicorn aktif di VPS.";
         }
 
-        setTimeout(() => scanner.resume(), 5000);
+        setTimeout(() => {
+            try { scanner.resume(); } catch(e){}
+        }, 5000);
     });
 
     function reportMerchant() {
